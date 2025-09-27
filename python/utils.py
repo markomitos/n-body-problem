@@ -26,8 +26,8 @@ def save_results(filepath, history):
     print(f"Saving results to file: {filepath}")
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, 'w') as f:
-        f.write("timestep,body_id,x,y\n")
+        f.write("timestep,x,y\n")
         for timestep, positions in enumerate(history):
-            for body_id, pos in enumerate(positions):
-                f.write(f"{timestep},{body_id},{pos[0]},{pos[1]}\n")
+            for pos in positions:
+                f.write(f"{timestep},{pos[0]},{pos[1]}\n")
     print("Results saved successfully.")

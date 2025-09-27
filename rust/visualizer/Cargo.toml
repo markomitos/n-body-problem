@@ -1,0 +1,13 @@
+[package]
+name = "visualizer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nalgebra = "0.34.1"
+csv = "1.3"
+serde = { version = "1.0", features = ["derive"] }
+plotters = "0.3.5"
+indicatif = { version = "0.18.0", features = ["rayon"] }
+rayon = "1.11.0"
+clap = { version = "4.5.48", features = ["derive"] }

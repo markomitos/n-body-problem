@@ -1,0 +1,159 @@
+use nalgebra::Vector2;
+use plotters::prelude::*;
+use serde::Deserialize;
+use std::error::Error;
+use std::process::Command;
+use rayon::prelude::*;
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
+use clap::Parser;
+
+#[derive(Debug, Deserialize)]
+struct InputRecord {
+    timestep: usize,
+    x: f64,
+    y: f64,
+}
+
+
+/// Reads the simulation data from a CSV file and groups it by timestep.
+fn read_csv_data(filepath: &str) -> Result<Vec<Vec<Vector2<f64>>>, Box<dyn Error>> {
+    println!("Reading data from {}...", filepath);
+    let mut reader = csv::Reader::from_path(filepath)?;
+    let mut data: Vec<Vec<Vector2<f64>>> = Vec::new();
+
+    for result in reader.deserialize() {
+        let record: InputRecord = result?;
+        if record.timestep >= data.len() {
+            data.resize(record.timestep + 1, Vec::new());
+        }
+        data[record.timestep].push(Vector2::new(record.x, record.y));
+    }
+    println!("Successfully read {} timesteps.", data.len());
+    Ok(data)
+}
+
+/// Renders all timesteps of the simulation data into individual PNG frames in parallel.
+fn render_all_frames(data: &[Vec<Vector2<f64>>], output_dir: &str) -> Result<(), Box<dyn Error>> {
+    println!("Rendering frames in parallel into '{}' directory...", output_dir);
+    std::fs::create_dir_all(output_dir)?;
+
+    let bar = ProgressBar::new(data.len() as u64);
+    bar.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")?
+        .progress_chars("#>-"));
+
+    data.par_iter()
+        .enumerate()
+        .progress_with(bar)
+        .for_each(|(timestep, positions)| {
+            if positions.is_empty() { return; }
+
+            let mut x_coords: Vec<f64> = positions.iter().map(|p| p.x).collect();
+            let mut y_coords: Vec<f64> = positions.iter().map(|p| p.y).collect();
+            x_coords.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            y_coords.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+            let lower_bound_index = (x_coords.len() as f64 * 0.05) as usize;
+            let upper_bound_index = ((x_coords.len() as f64 * 0.95) as usize).min(x_coords.len() - 1);
+
+            let min_x = x_coords[lower_bound_index];
+            let max_x = x_coords[upper_bound_index];
+            let min_y = y_coords[lower_bound_index];
+            let max_y = y_coords[upper_bound_index];
+
+            let margin_x = (max_x - min_x) * 0.1;
+            let margin_y = (max_y - min_y) * 0.1;
+
+            let x_range = (min_x - margin_x)..(max_x + margin_x + 1e-9);
+            let y_range = (min_y - margin_y)..(max_y + margin_y + 1e-9);
+
+            if let Err(e) = render_frame(timestep, positions, output_dir, x_range, y_range) {
+                eprintln!("Failed to render frame {}: {}", timestep, e);
+            }
+        });
+
+    println!("All frames rendered successfully.");
+    Ok(())
+}
+
+/// Renders a single frame for a given timestep.
+fn render_frame(
+    timestep: usize,
+    positions: &[Vector2<f64>],
+    output_dir: &str,
+    x_range: std::ops::Range<f64>,
+    y_range: std::ops::Range<f64>,
+) -> Result<(), Box<dyn Error>> {
+    let frame_path = format!("{}/frame_{:04}.png", output_dir, timestep);
+    let root = BitMapBackend::new(&frame_path, (800, 800)).into_drawing_area();
+    root.fill(&BLACK)?;
+
+    let mut chart = ChartBuilder::on(&root)
+        .caption(format!("N-Body Simulation: Timestep {}", timestep), ("sans-serif", 30).into_font().color(&WHITE))
+        .margin(10)
+        .build_cartesian_2d(x_range, y_range)?;
+
+    chart.configure_mesh().disable_x_mesh().disable_y_mesh().draw()?;
+
+    chart.draw_series(
+        positions.iter().map(|pos| Circle::new((pos.x, pos.y), 3, WHITE.filled()))
+    )?;
+
+    root.present()?;
+    Ok(())
+}
+
+/// Combines the generated PNG frames into an MP4 video using FFmpeg.
+fn create_video(output_dir: &str, video_file: &str) -> Result<(), Box<dyn Error>> {
+    println!("\nCombining frames into video: {}...", video_file);
+
+    let output = Command::new("ffmpeg")
+        .arg("-framerate")
+        .arg("30")
+        .arg("-i")
+        .arg(format!("{}/frame_%04d.png", output_dir))
+        .arg("-c:v")
+        .arg("libx264")
+        .arg("-pix_fmt")
+        .arg("yuv420p")
+        .arg("-r")
+        .arg("30")
+        .arg("-y")
+        .arg(video_file)
+        .output()?;
+
+    if output.status.success() {
+        println!("Video created successfully: {}", video_file);
+    } else {
+        eprintln!("FFmpeg command failed.");
+        eprintln!("stdout: {}", String::from_utf8_lossy(&output.stdout));
+        eprintln!("stderr: {}", String::from_utf8_lossy(&output.stderr));
+    }
+
+    Ok(())
+}
+
+/// A visualizer for the N-body simulation that creates a video from CSV data.
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Cli {
+    /// Path to the input CSV file generated by the runner.
+    #[arg(long, default_value_t = String::from("data/output.csv"))]
+    input_file: String,
+
+    /// Directory to save the output PNG frames.
+    #[arg(long, default_value_t = String::from("frames"))]
+    output_dir: String,
+
+    /// Name of the final output video file.
+    #[arg(long, default_value_t = String::from("simulation.mp4"))]
+    video_file: String,
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let cli = Cli::parse();
+    let data = read_csv_data(&cli.input_file)?;
+    render_all_frames(&data, &cli.output_dir)?;
+    create_video(&cli.output_dir, &cli.video_file)?;
+    Ok(())
+}
