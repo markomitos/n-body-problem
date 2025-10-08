@@ -4,7 +4,7 @@ use nbody_lib::{
 };
 use nalgebra::Vector2;
 use clap::{Parser, ValueEnum};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 /// Enum to represent the simulation mode
 #[derive(ValueEnum, Debug, Clone, Copy)]
@@ -58,12 +58,15 @@ fn run_simulation(bodies: &mut Vec<Body>, timesteps: usize, mode: Mode) -> Vec<V
     position_history.push(get_positions(bodies));
 
     println!("Starting {:?} simulation for {} timesteps...", mode, timesteps);
+    let mut force_calculation_duration = Duration::ZERO;
 
     for step in 0..timesteps {
+        let force_timer = Instant::now();
         let forces = match mode {
             Mode::Sequential => calculate_forces(bodies),
             Mode::Parallel => calculate_forces_parallel(bodies),
         };
+        force_calculation_duration += force_timer.elapsed();
 
         for (i, body) in bodies.iter_mut().enumerate() {
             let acceleration = forces[i] / body.mass;
@@ -77,6 +80,7 @@ fn run_simulation(bodies: &mut Vec<Body>, timesteps: usize, mode: Mode) -> Vec<V
             println!("... Step {}/{}", step + 1, timesteps);
         }
     }
+    println!("Total force calculation time: {:.4?}", force_calculation_duration);
 
     position_history
 }
