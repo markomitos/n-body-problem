@@ -5,7 +5,9 @@
 This project solves the **n-body problem**: simulating a dynamic system of particles (bodies) that interact with each other through physical forces, most commonly gravity. The goal of the simulation is to predict the motion, i.e. the trajectories, of these bodies over time from their initial positions, masses and velocities.
 
 Every body in the system attracts every other body with a force defined by Newton's law of universal gravitation:
+
 $$ F = G \frac{m_1 m_2}{r^2} $$
+
 where $m_1$ and $m_2$ are the masses of the two bodies, $r$ is the distance between them, and $G$ is the gravitational constant.
 
 The computational complexity of calculating the forces in each time step is $O(n^2)$, because the interaction has to be computed for every pair of bodies. This makes the problem computationally intensive and an ideal candidate for parallelisation.
@@ -13,12 +15,15 @@ The computational complexity of calculating the forces in each time step is $O(n
 The simulation runs as an iterative process in discrete time steps ($\Delta t$). In each step, the state of the system is updated using **Euler integration**:
 
 1.  **Force calculation:** For every body $i$, the total force $\vec{F_i}$ is computed. The force between two bodies follows Newton's law, with a **softening factor ($\epsilon$)** added to the denominator to avoid numerical instability (division by zero) when two bodies get too close:
+
     $$ \vec{F}_{ij} = G \frac{m_i m_j}{|\vec{r}_{ij}|^2 + \epsilon^2} \cdot \frac{\vec{r}_{ij}}{|\vec{r}_{ij}|} $$
 
 2.  **Velocity update:** From the total force $\vec{F_i}$ and Newton's second law ($\vec{a_i} = \vec{F_i} / m_i$), the new velocity is computed:
+
     $$ \vec{v}_{i, new} = \vec{v}_{i, old} + \vec{a_i} \cdot \Delta t $$
 
 3.  **Position update:** The new position of the body is determined from its new velocity:
+
     $$ \vec{p}_{i, new} = \vec{p}_{i, old} + \vec{v}_{i, new} \cdot \Delta t $$
 
 This cycle repeats for a defined number of steps, and the positions of the bodies are written to an output CSV file for later analysis and visualisation.
