@@ -16,15 +16,21 @@ The simulation runs as an iterative process in discrete time steps ($\Delta t$).
 
 1.  **Force calculation:** For every body $i$, the total force $\vec{F_i}$ is computed. The force between two bodies follows Newton's law, with a **softening factor ($\epsilon$)** added to the denominator to avoid numerical instability (division by zero) when two bodies get too close:
 
-    $$ \vec{F}_{ij} = G \frac{m_i m_j}{|\vec{r}_{ij}|^2 + \epsilon^2} \cdot \frac{\vec{r}_{ij}}{|\vec{r}_{ij}|} $$
+$$
+     \vec{F}_{ij} = G \frac{m_i m_j}{|\vec{r}_{ij}|^2 + \epsilon^2} \cdot \frac{\vec{r}_{ij}}{|\vec{r}_{ij}|} 
+$$
 
 2.  **Velocity update:** From the total force $\vec{F_i}$ and Newton's second law ($\vec{a_i} = \vec{F_i} / m_i$), the new velocity is computed:
 
-    $$ \vec{v}_{i, new} = \vec{v}_{i, old} + \vec{a_i} \cdot \Delta t $$
+$$
+     \vec{v}_{i, new} = \vec{v}_{i, old} + \vec{a_i} \cdot \Delta t 
+$$
 
 3.  **Position update:** The new position of the body is determined from its new velocity:
 
-    $$ \vec{p}_{i, new} = \vec{p}_{i, old} + \vec{v}_{i, new} \cdot \Delta t $$
+$$
+     \vec{p}_{i, new} = \vec{p}_{i, old} + \vec{v}_{i, new} \cdot \Delta t 
+$$
 
 This cycle repeats for a defined number of steps, and the positions of the bodies are written to an output CSV file for later analysis and visualisation.
 
